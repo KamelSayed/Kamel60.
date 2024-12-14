@@ -1,0 +1,107 @@
+{
+    "inventory": [
+        {
+            "id": 1,
+            "name": "شاكوش",
+            "quantity": 10,
+            "used": 3,
+            "description": "شاكوش حديد مقاس متوسط",
+            "category": "أدوات يدوية"
+        },
+        {
+            "id": 2,
+            "name": "مفك براغي",
+            "quantity": 15,
+            "used": 5,
+            "description": "مفك براغي متعدد المقاسات",
+            "category": "أدوات يدوية"
+        },
+        {
+            "id": 3,
+            "name": "منشار كهربائي",
+            "quantity": 5,
+            "used": 2,
+            "description": "منشار كهربائي احترافي",
+            "category": "أدوات كهربائية"
+        }
+    ],
+    "boxes": [
+        {
+            "id": 1,
+            "name": "صندوق 1",
+            "receiver": "أحمد محمد",
+            "location": "المستودع الرئيسي",
+            "items": [
+                {
+                    "id": 1,
+                    "name": "شاكوش",
+                    "quantity": 2
+                },
+                {
+                    "id": 2,
+                    "name": "مفك براغي",
+                    "quantity": 3
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "صندوق 2",
+            "receiver": "محمد علي",
+            "location": "الورشة",
+            "items": [
+                {
+                    "id": 3,
+                    "name": "منشار كهربائي",
+                    "quantity": 1
+                }
+            ]
+        }
+    ],
+    "missingItems": [
+        {
+            "id": 1,
+            "name": "شاكوش",
+            "description": "فقد من الورشة",
+            "location": "الورشة",
+            "status": "pending"
+        }
+    ],
+    "activities": [
+        {
+            "id": 1,
+            "type": "box",
+            "description": "تم إنشاء صندوق 1",
+            "timestamp": "2024-12-14T18:00:00+02:00",
+            "details": {
+                "action": "create",
+                "boxId": 1,
+                "boxName": "صندوق 1",
+                "location": "المستودع الرئيسي"
+            }
+        },
+        {
+            "id": 2,
+            "type": "box",
+            "description": "تم إنشاء صندوق 2",
+            "timestamp": "2024-12-14T18:30:00+02:00",
+            "details": {
+                "action": "create",
+                "boxId": 2,
+                "boxName": "صندوق 2",
+                "location": "الورشة"
+            }
+        },
+        {
+            "id": 3,
+            "type": "missing",
+            "description": "تم تسجيل نقص: شاكوش",
+            "timestamp": "2024-12-14T19:00:00+02:00",
+            "details": {
+                "action": "create",
+                "itemName": "شاكوش",
+                "location": "الورشة"
+            }
+        }
+    ]
+}

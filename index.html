@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المعدات</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- القائمة الجانبية -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>نظام المعدات</h1>
+            </div>
+            <nav>
+                <button onclick="showSection('inventory')" class="nav-btn">
+                    المخزون
+                </button>
+                <button onclick="showSection('boxes')" class="nav-btn">
+                    الصناديق النشطة
+                </button>
+                <button onclick="showSection('expiredBoxes')" class="nav-btn">
+                    الصناديق المنتهية
+                </button>
+                <button onclick="showSection('missingItems')" class="nav-btn">
+                    نواقص المعدات
+                    <span id="missingItemsCounter" class="counter-badge"></span>
+                </button>
+                <button onclick="showSection('activities')" class="nav-btn">
+                    النشاطات
+                </button>
+            </nav>
+            <div class="actions">
+                <button onclick="showModal('addItemModal')" class="action-btn">
+                    إضافة معدة جديدة
+                </button>
+                <button onclick="showModal('addBoxModal')" class="action-btn primary">
+                    إضافة صندوق
+                </button>
+            </div>
+        </aside>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="main">
+            <!-- شريط الأدوات -->
+            <div class="toolbar">
+                <div class="data-actions">
+                    <button class="btn primary" onclick="downloadData()">
+                        <i class="fas fa-download"></i>
+                        تحميل البيانات
+                    </button>
+                    <label class="btn success upload-btn">
+                        <i class="fas fa-upload"></i>
+                        رفع البيانات
+                        <input type="file" id="uploadData" accept=".json" onchange="uploadData(event)" style="display: none;">
+                    </label>
+                </div>
+                <div class="search">
+                    <input type="text" id="searchInput" placeholder="بحث..." oninput="handleSearch()">
+                </div>
+                <div class="view-options">
+                    <button onclick="toggleView('grid')" class="view-btn active">
+                        شبكة
+                    </button>
+                    <button onclick="toggleView('list')" class="view-btn">
+                        قائمة
+                    </button>
+                </div>
+            </div>
+
+            <!-- قسم المخزون -->
+            <section id="inventory" class="section active">
+                <div class="section-header">
+                    <h2>المخزون</h2>
+                    <div class="filters">
+                        <select id="sortInventory" onchange="sortInventory()">
+                            <option value="name">الاسم</option>
+                            <option value="quantity">الكمية</option>
+                            <option value="usage">الاستخدام</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="inventoryGrid" class="grid"></div>
+            </section>
+
+            <!-- قسم الصناديق -->
+            <section id="boxes" class="section">
+                <div class="section-header">
+                    <h2>الصناديق النشطة</h2>
+                    <button onclick="showModal('addBoxModal')" class="btn primary">
+                        <i class="fas fa-plus"></i>
+                        إضافة صندوق
+                    </button>
+                </div>
+                <div class="filters">
+                    <input type="text" id="searchBoxes" oninput="handleSearch()" placeholder="بحث...">
+                </div>
+                <div id="boxesGrid" class="grid"></div>
+            </section>
+
+            <!-- قسم الصناديق منتهية الصلاحية -->
+            <section id="expiredBoxes" class="section">
+                <div class="section-header">
+                    <h2>الصناديق منتهية الصلاحية</h2>
+                </div>
+                <div class="filters">
+                    <input type="text" id="searchExpiredBoxes" oninput="handleExpiredSearch()" placeholder="بحث...">
+                </div>
+                <div id="expiredBoxesGrid" class="grid"></div>
+            </section>
+
+            <!-- قسم نواقص المعدات -->
+            <section id="missingItems" class="section danger-section">
+                <div class="section-header">
+                    <h2>نواقص المعدات</h2>
+                    <div class="header-actions">
+                        <button onclick="clearMissingNotification()" class="btn" id="clearMissingBtn" style="display: none;">
+                            <i class="fas fa-times"></i>
+                            إزالة الإشعار
+                        </button>
+                        <button onclick="showModal('addMissingItemModal')" class="btn danger">
+                            <i class="fas fa-plus"></i>
+                            إضافة نواقص
+                        </button>
+                    </div>
+                </div>
+                <div id="missingItemsGrid" class="grid"></div>
+            </section>
+
+            <!-- قسم السجل -->
+            <section id="activities" class="section">
+                <div class="section-header">
+                    <h2>السجل</h2>
+                    <div class="filter-controls">
+                        <input type="text" id="activitySearch" placeholder="بحث في السجل..." class="search-input">
+                        <select id="activityFilter" class="filter-select">
+                            <option value="">الكل</option>
+                            <option value="box">الصناديق</option>
+                            <option value="receiver">المستلمين</option>
+                            <option value="item">المعدات</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="activitiesList"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- النوافذ المنبثقة -->
+    <!-- إضافة معدة -->
+    <div id="addItemModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إضافة معدة جديدة</h3>
+                <button onclick="closeModal('addItemModal')" class="close-btn">&times;</button>
+            </div>
+            <form id="addItemForm" onsubmit="handleAddItem(event)">
+                <div class="form-group">
+                    <label>اسم المعدة</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>الكمية</label>
+                    <div class="quantity-input">
+                        <button type="button" onclick="adjustQuantity('itemQuantity', -1)">-</button>
+                        <input type="number" id="itemQuantity" name="quantity" value="1" min="1" required>
+                        <button type="button" onclick="adjustQuantity('itemQuantity', 1)">+</button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">إضافة</button>
+                    <button type="button" onclick="closeModal('addItemModal')" class="btn">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- إضافة صندوق -->
+    <div id="addBoxModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إضافة صندوق جديد</h3>
+                <button onclick="closeModal('addBoxModal')" class="close-btn">&times;</button>
+            </div>
+            <form id="addBoxForm" onsubmit="handleAddBox(event)">
+                <div class="form-group">
+                    <label>الاسم</label>
+                    <input type="text" id="boxName" name="name">
+                </div>
+                <div class="form-group">
+                    <label>المستلم</label>
+                    <input type="text" id="boxReceiver" name="receiver">
+                </div>
+                <div class="form-group">
+                    <label>الموقع</label>
+                    <input type="text" id="boxLocation" name="location">
+                </div>
+                <div class="form-group">
+                    <label>المعدات</label>
+                    <div id="boxItems"></div>
+                    <button type="button" onclick="addBoxItem()" class="btn secondary">
+                        إضافة معدة
+                    </button>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">حفظ</button>
+                    <button type="button" onclick="closeModal('addBoxModal')" class="btn">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- تعديل الصندوق -->
+    <div id="editBoxModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>تعديل الصندوق</h3>
+                <button onclick="closeModal('editBoxModal')" class="close-btn">&times;</button>
+            </div>
+            <form id="editBoxForm" onsubmit="handleEditBox(event)">
+                <input type="hidden" id="editBoxId" name="id">
+                <div class="form-group">
+                    <label>الاسم</label>
+                    <input type="text" id="editBoxName" name="name">
+                </div>
+                <div class="form-group">
+                    <label>المستلم</label>
+                    <input type="text" id="editBoxReceiver" name="receiver">
+                </div>
+                <div class="form-group">
+                    <label>الموقع</label>
+                    <input type="text" id="editBoxLocation" name="location">
+                </div>
+                <div class="form-group">
+                    <label>المعدات</label>
+                    <div id="editBoxItems"></div>
+                    <button type="button" onclick="addEditBoxItem()" class="btn secondary">
+                        إضافة معدة
+                    </button>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn primary">حفظ</button>
+                    <button type="button" onclick="closeModal('editBoxModal')" class="btn">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- إضافة نواقص -->
+    <div id="addMissingItemModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إضافة نواقص معدات</h3>
+                <button onclick="closeModal('addMissingItemModal')" class="close-btn">&times;</button>
+            </div>
+            <form id="addMissingItemForm" onsubmit="handleAddMissingItem(event)">
+                <div class="form-group">
+                    <label>المعدة</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>الكمية المطلوبة</label>
+                    <input type="number" name="quantity" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>ملاحظات</label>
+                    <textarea name="notes"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn danger">إضافة</button>
+                    <button type="button" onclick="closeModal('addMissingItemModal')" class="btn">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- الإشعارات -->
+    <div id="notifications"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

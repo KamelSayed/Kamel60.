@@ -8,18 +8,69 @@ let state = {
     missingItems: []
 };
 
-// تحميل البيانات
-function loadData() {
-    const savedState = localStorage.getItem('equipmentSystem');
-    if (savedState) {
-        state = JSON.parse(savedState);
-        renderAll();
+// تحميل البيانات من الملف
+async function loadData() {
+    try {
+        const response = await fetch('data.json');
+        if (!response.ok) {
+            throw new Error('فشل في تحميل البيانات');
+        }
+        const data = await response.json();
+        
+        // التحقق من صحة البيانات
+        if (validateData(data)) {
+            state.inventory = data.inventory || [];
+            state.boxes = data.boxes || [];
+            state.missingItems = data.missingItems || [];
+            state.activities = data.activities || [];
+            renderAll();
+        } else {
+            showNotification('تنسيق البيانات غير صحيح', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('حدث خطأ أثناء تحميل البيانات', 'error');
+        
+        // في حالة فشل تحميل الملف، نستخدم بيانات افتراضية
+        state.inventory = [];
+        state.boxes = [];
+        state.missingItems = [];
+        state.activities = [];
     }
 }
 
-// حفظ البيانات
-function saveData() {
-    localStorage.setItem('equipmentSystem', JSON.stringify(state));
+// حفظ البيانات في الملف
+async function saveData() {
+    const data = {
+        inventory: state.inventory,
+        boxes: state.boxes,
+        missingItems: state.missingItems,
+        activities: state.activities
+    };
+
+    try {
+        const response = await fetch('save_data.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error('فشل في حفظ البيانات');
+        }
+
+        const result = await response.json();
+        if (result.success) {
+            showNotification('تم حفظ البيانات بنجاح');
+        } else {
+            throw new Error(result.message || 'فشل في حفظ البيانات');
+        }
+    } catch (error) {
+        console.error('Error saving data:', error);
+        showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
+    }
 }
 
 // تحميل البيانات كملف JSON

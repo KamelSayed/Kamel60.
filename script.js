@@ -11,66 +11,167 @@ let state = {
 // تحميل البيانات من الملف
 async function loadData() {
     try {
+        // محاولة تحميل البيانات من localStorage أولاً
+        const savedState = localStorage.getItem('equipmentSystem');
+        if (savedState) {
+            const parsedState = JSON.parse(savedState);
+            if (validateData(parsedState)) {
+                state = parsedState;
+                renderAll();
+                return;
+            }
+        }
+
+        // إذا لم تكن هناك بيانات في localStorage، نحاول تحميل البيانات من الملف
         const response = await fetch('data.json');
         if (!response.ok) {
             throw new Error('فشل في تحميل البيانات');
         }
         const data = await response.json();
         
-        // التحقق من صحة البيانات
         if (validateData(data)) {
-            state.inventory = data.inventory || [];
-            state.boxes = data.boxes || [];
-            state.missingItems = data.missingItems || [];
-            state.activities = data.activities || [];
+            state = data;
+            saveToLocalStorage();
             renderAll();
         } else {
-            showNotification('تنسيق البيانات غير صحيح', 'error');
+            throw new Error('تنسيق البيانات غير صحيح');
         }
     } catch (error) {
         console.error('Error loading data:', error);
-        showNotification('حدث خطأ أثناء تحميل البيانات', 'error');
+        showNotification('جاري استخدام البيانات الافتراضية', 'warning');
         
-        // في حالة فشل تحميل الملف، نستخدم بيانات افتراضية
-        state.inventory = [];
-        state.boxes = [];
-        state.missingItems = [];
-        state.activities = [];
+        // استخدام البيانات الافتراضية
+        state = {
+            inventory: [],
+            boxes: [],
+            missingItems: [],
+            activities: [],
+            view: 'grid',
+            activeSection: 'inventory'
+        };
+        saveToLocalStorage();
+    }
+}
+
+// حفظ البيانات في localStorage
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem('equipmentSystem', JSON.stringify(state));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+        showNotification('فشل في حفظ البيانات محلياً', 'error');
     }
 }
 
 // حفظ البيانات في الملف
 async function saveData() {
-    const data = {
-        inventory: state.inventory,
-        boxes: state.boxes,
-        missingItems: state.missingItems,
-        activities: state.activities
-    };
-
     try {
-        const response = await fetch('save_data.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-
-        if (!response.ok) {
-            throw new Error('فشل في حفظ البيانات');
-        }
-
-        const result = await response.json();
-        if (result.success) {
-            showNotification('تم حفظ البيانات بنجاح');
-        } else {
-            throw new Error(result.message || 'فشل في حفظ البيانات');
-        }
+        // حفظ في localStorage أولاً
+        saveToLocalStorage();
+        
+        // تحضير البيانات للحفظ
+        const data = JSON.stringify(state, null, 2);
+        
+        // إنشاء ملف للتحميل
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        // تحميل الملف
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'equipment_data.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showNotification('تم حفظ البيانات بنجاح');
     } catch (error) {
         console.error('Error saving data:', error);
         showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
     }
+}
+
+// تحميل البيانات من ملف
+function uploadData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            if (!validateData(data)) {
+                showNotification('الملف غير صالح. يجب أن يحتوي على جميع البيانات المطلوبة', 'error');
+                return;
+            }
+            
+            // دمج البيانات الجديدة مع البيانات الحالية
+            const mergedData = mergeData(data);
+            
+            // تحديث state
+            state = mergedData;
+            
+            // حفظ البيانات
+            saveToLocalStorage();
+            
+            // إضافة نشاط الاستيراد
+            addActivity(
+                'تم استيراد بيانات جديدة',
+                'system',
+                {
+                    action: 'import',
+                    filename: file.name
+                }
+            );
+            
+            renderAll();
+            showNotification('تم استيراد البيانات بنجاح');
+            
+        } catch (error) {
+            console.error('Error importing data:', error);
+            showNotification('فشل في قراءة الملف. تأكد من أن الملف بتنسيق JSON صحيح', 'error');
+        }
+    };
+    
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// دمج البيانات الجديدة مع البيانات الحالية
+function mergeData(newData) {
+    const mergedData = { ...state };
+    
+    // دمج المخزون
+    mergedData.inventory = mergeArrays(state.inventory, newData.inventory, 'id');
+    
+    // دمج الصناديق
+    mergedData.boxes = mergeArrays(state.boxes, newData.boxes, 'id');
+    
+    // دمج النواقص
+    mergedData.missingItems = mergeArrays(state.missingItems, newData.missingItems, 'id');
+    
+    // دمج الأنشطة مع الحفاظ على الترتيب الزمني
+    mergedData.activities = [...state.activities, ...newData.activities]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    return mergedData;
+}
+
+// دمج مصفوفتين مع تجنب التكرار
+function mergeArrays(arr1, arr2, idField) {
+    const merged = [...arr1];
+    const ids = new Set(arr1.map(item => item[idField]));
+    
+    arr2.forEach(item => {
+        if (!ids.has(item[idField])) {
+            merged.push(item);
+            ids.add(item[idField]);
+        }
+    });
+    
+    return merged;
 }
 
 // تحميل البيانات كملف JSON
@@ -746,7 +847,7 @@ function showAddMissing(boxId) {
 
     document.getElementById('missingBoxId').value = boxId;
     const select = document.getElementById('missingItemSelect');
-    select.innerHTML = '<option value="">اختر المعدة</option>';
+    select.innerHTML = '<option value="">اختر معدة</option>';
     
     // إضافة المعدات الموجودة في الصندوق فقط
     box.items.forEach(item => {
@@ -1112,7 +1213,7 @@ function handleEditItem(event) {
     addActivity(`تم تعديل معدة ${oldName !== item.name ? `من ${oldName} إلى ${item.name}` : item.name} (الكمية: ${oldQuantity} → ${newQuantity})`, 'inventory');
     showNotification('تم تحديث المعدة بنجاح');
     closeModal('editItemModal');
-    renderAll();
+    renderInventory();
     saveData();
 }
 
@@ -1827,160 +1928,6 @@ function getActivityExtraDetails(activity) {
     return extraDetails;
 }
 
-// تحسين إضافة معدة في نموذج تعديل الصندوق
-function addEditBoxItem() {
-    const editBoxItems = document.getElementById('editBoxItems');
-    const itemCount = editBoxItems.children.length;
-    
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'edit-box-item';
-    itemDiv.innerHTML = `
-        <div class="form-group">
-            <select name="items[${itemCount}][id]" required onchange="updateEditBoxItemQuantity(this)">
-                <option value="">اختر معدة</option>
-                ${state.inventory.map(item => `
-                    <option value="${item.id}" 
-                        data-available="${item.quantity - item.used}"
-                        data-name="${item.name}">
-                        ${item.name} (متاح: ${item.quantity - item.used})
-                    </option>
-                `).join('')}
-            </select>
-        </div>
-        <div class="form-group">
-            <input type="number" name="items[${itemCount}][quantity]" 
-                placeholder="الكمية" required min="1" 
-                onchange="validateEditBoxItemQuantity(this)">
-        </div>
-        <button type="button" class="btn danger" onclick="removeEditBoxItem(this)">
-            <i class="fas fa-trash"></i>
-        </button>
-    `;
-    
-    editBoxItems.appendChild(itemDiv);
-}
-
-// تحديث الكمية المتاحة عند اختيار المعدة
-function updateEditBoxItemQuantity(select) {
-    const quantityInput = select.parentElement.nextElementSibling.querySelector('input');
-    const selectedOption = select.options[select.selectedIndex];
-    
-    if (selectedOption.value) {
-        const available = parseInt(selectedOption.dataset.available);
-        quantityInput.max = available;
-        quantityInput.value = Math.min(quantityInput.value || 1, available);
-    }
-}
-
-// التحقق من صحة الكمية
-function validateEditBoxItemQuantity(input) {
-    const select = input.parentElement.previousElementSibling.querySelector('select');
-    const selectedOption = select.options[select.selectedIndex];
-    
-    if (selectedOption.value) {
-        const available = parseInt(selectedOption.dataset.available);
-        if (parseInt(input.value) > available) {
-            input.value = available;
-            showNotification(`الكمية المتاحة من ${selectedOption.dataset.name} هي ${available} فقط`, 'warning');
-        }
-    }
-}
-
-// حذف معدة من نموذج التعديل
-function removeEditBoxItem(button) {
-    button.closest('.edit-box-item').remove();
-}
-
-// تحسين معالجة تعديل الصندوق
-function handleEditBox(event) {
-    event.preventDefault();
-    const form = event.target;
-    const boxId = parseInt(form.id.value);
-    const box = state.boxes.find(b => b.id === boxId);
-    
-    if (!box) return;
-
-    // تحديث معلومات الصندوق
-    const oldName = box.name;
-    const oldReceiver = box.receiver;
-    const oldLocation = box.location;
-
-    box.name = form.name.value;
-    box.receiver = form.receiver.value;
-    box.location = form.location.value;
-
-    // جمع المعدات الجديدة
-    const newItems = [];
-    const itemElements = form.querySelectorAll('.edit-box-item');
-    
-    itemElements.forEach(itemElement => {
-        const select = itemElement.querySelector('select');
-        const quantityInput = itemElement.querySelector('input[type="number"]');
-        
-        if (select.value && quantityInput.value) {
-            const itemId = parseInt(select.value);
-            const quantity = parseInt(quantityInput.value);
-            const inventoryItem = state.inventory.find(i => i.id === itemId);
-            
-            if (inventoryItem) {
-                newItems.push({
-                    id: itemId,
-                    name: inventoryItem.name,
-                    quantity: quantity
-                });
-            }
-        }
-    });
-
-    // تحديث الكميات في المخزون
-    box.items.forEach(oldItem => {
-        const inventoryItem = state.inventory.find(i => i.id === oldItem.id);
-        if (inventoryItem) {
-            inventoryItem.used -= oldItem.quantity;
-        }
-    });
-
-    // تحديث المعدات وإضافة النشاط
-    box.items = newItems;
-    
-    // تحديث الكميات الجديدة في المخزون
-    newItems.forEach(newItem => {
-        const inventoryItem = state.inventory.find(i => i.id === newItem.id);
-        if (inventoryItem) {
-            inventoryItem.used += newItem.quantity;
-        }
-    });
-
-    // إضافة نشاط التعديل
-    const changes = [];
-    if (box.name !== oldName) {
-        changes.push(`تغيير الاسم من "${oldName || '-'}" إلى "${box.name || '-'}"`);
-    }
-    if (box.receiver !== oldReceiver) {
-        changes.push(`تغيير المستلم من "${oldReceiver || '-'}" إلى "${box.receiver || '-'}"`);
-    }
-    if (box.location !== oldLocation) {
-        changes.push(`تغيير الموقع من "${oldLocation || '-'}" إلى "${box.location || '-'}"`);
-    }
-
-    addActivity(
-        `تم تعديل صندوق ${box.name || box.receiver}${changes.length ? `: ${changes.join('، ')}` : ''}`,
-        'box',
-        {
-            action: 'edit_box',
-            boxId,
-            boxName: box.name || box.receiver,
-            changes,
-            location: box.location
-        }
-    );
-
-    showNotification('تم تحديث الصندوق بنجاح');
-    closeModal('editBoxModal');
-    renderAll();
-    saveData();
-}
-
 // تحسين عرض نموذج تعديل الصندوق
 function showEditBox(boxId) {
     const box = state.boxes.find(b => b.id === boxId);
@@ -2003,17 +1950,16 @@ function showEditBox(boxId) {
                     <option value="">اختر معدة</option>
                     ${state.inventory.map(invItem => `
                         <option value="${invItem.id}" 
-                            data-available="${invItem.quantity - invItem.used + (invItem.id === item.id ? item.quantity : 0)}"
-                            data-name="${invItem.name}"
-                            ${invItem.id === item.id ? 'selected' : ''}>
-                            ${invItem.name} (متوفر: ${invItem.quantity - invItem.used + (invItem.id === item.id ? item.quantity : 0)})
+                            data-available="${invItem.quantity - invItem.used}"
+                            data-name="${invItem.name}">
+                            ${invItem.name} (متاح: ${invItem.quantity - invItem.used})
                         </option>
                     `).join('')}
                 </select>
             </div>
             <div class="form-group">
                 <input type="number" name="items[${index}][quantity]" 
-                    value="${item.quantity}" required min="1"
+                    value="${item.quantity}" required min="1" 
                     onchange="validateEditBoxItemQuantity(this)">
             </div>
             <button type="button" class="btn danger" onclick="removeEditBoxItem(this)">

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار النظام</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            direction: rtl;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>اختبار نظام المعدات</h1>
+    <button onclick="testLocalStorage()">اختبار التخزين المحلي</button>
+    <button onclick="testDOMElements()">اختبار عناصر الصفحة</button>
+    <button onclick="testJavaScript()">اختبار JavaScript</button>
+    <div id="output"></div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += `<p>${message}</p>`;
+        }
+
+        function testLocalStorage() {
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.getItem('test');
+                localStorage.removeItem('test');
+                log('✅ التخزين المحلي يعمل بشكل صحيح');
+            } catch (e) {
+                log('❌ خطأ في التخزين المحلي: ' + e.message);
+            }
+        }
+
+        function testDOMElements() {
+            try {
+                const elements = ['boxesGrid', 'storageItems', 'notification-container'];
+                const missing = elements.filter(id => !document.getElementById(id));
+                if (missing.length > 0) {
+                    log('❌ العناصر التالية غير موجودة: ' + missing.join(', '));
+                } else {
+                    log('✅ جميع العناصر الأساسية موجودة');
+                }
+            } catch (e) {
+                log('❌ خطأ في فحص العناصر: ' + e.message);
+            }
+        }
+
+        function testJavaScript() {
+            try {
+                // Test basic array operations
+                const arr = [];
+                arr.push({test: 'test'});
+                // Test JSON operations
+                JSON.parse(JSON.stringify({test: 'test'}));
+                log('✅ JavaScript يعمل بشكل صحيح');
+            } catch (e) {
+                log('❌ خطأ في JavaScript: ' + e.message);
+            }
+        }
+
+        // Run tests on load
+        window.onload = () => {
+            log('بدء الاختبارات...');
+            testLocalStorage();
+            testDOMElements();
+            testJavaScript();
+        };
+    </script>
+</body>
+</html>
